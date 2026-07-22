@@ -1,6 +1,12 @@
 import { verifyToken } from "https://esm.sh/@clerk/backend@1.21.0"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+}
+
 async function verifyCaller(req: Request) {
   const authHeader = req.headers.get("authorization") ?? ""
   const token = authHeader.replace(/^Bearer\s+/i, "")
@@ -32,7 +38,10 @@ async function getZoomAccessToken() {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 })
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders })
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders })
+  }
 
   try {
     const { userId, role } = await verifyCaller(req)
@@ -78,13 +87,13 @@ Deno.serve(async (req) => {
     })
 
     return new Response(JSON.stringify({ joinUrl: meeting.join_url }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
     return new Response(JSON.stringify({ error: message }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   }
 })

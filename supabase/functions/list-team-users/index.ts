@@ -1,5 +1,11 @@
 import { verifyToken } from "https://esm.sh/@clerk/backend@1.21.0"
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+}
+
 interface ClerkUser {
   id: string
   first_name: string | null
@@ -23,7 +29,10 @@ async function verifyLeadership(req: Request): Promise<void> {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== "POST") return new Response("Method not allowed", { status: 405 })
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders })
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405, headers: corsHeaders })
+  }
 
   try {
     await verifyLeadership(req)
@@ -56,14 +65,14 @@ Deno.serve(async (req) => {
       })
 
     return new Response(JSON.stringify({ vas }), {
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error"
     const status = message === "Leadership access required" ? 403 : 400
     return new Response(JSON.stringify({ error: message }), {
       status,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     })
   }
 })
