@@ -1,97 +1,90 @@
 # Onboarding/Offboarding Hub
 
-Recruiting and onboarding tracker for the Team, ROA/Newbuild USA, and Mastermind tracks.
-React + Vite + TypeScript frontend, Supabase (Postgres, RLS, Edge Functions) backend, Clerk
-for auth.
+Recruiting and onboarding tracker with leadership-defined **Programs**, each with an ordered
+checklist of tasks (required/optional, with day-based due dates). React + Vite + TypeScript
+frontend, Supabase (Postgres, RLS, Edge Functions) backend, Clerk for auth.
 
-## Already provisioned
+Live at: https://onboarding-hub-ashy.vercel.app
+Repo: https://github.com/cedenogroupprojects/onboarding-hub (auto-deploys `master` to Vercel)
 
-- Supabase project: `onboarding-hub` (ref `ttfysuuxfxtjwnmxjxtm`, org "Cedeno Group"), schema
-  and RLS policies applied, seeded with default stages per track.
+## Already done
+
+- Supabase project: `onboarding-hub` (ref `ttfysuuxfxtjwnmxjxtm`, org "Cedeno Group"), full
+  schema + RLS applied (`supabase/migrations/`).
+- Clerk application created, session token customized, third-party auth linked to Supabase.
 - Edge Functions deployed: `list-team-users`, `gmail-send`, `ghl-webhook`, `stripe-webhook`,
   `sheets-sync`, `zoom-schedule`.
-- `.env.local` has the real Supabase URL/publishable key filled in.
+  - `list-team-users`, `gmail-send`, `zoom-schedule`, `sheets-sync` are called directly from
+    the browser and run with **`verify_jwt: false`**. This is intentional, not a hole:
+    Supabase's platform-level JWT gate doesn't currently trust Clerk-issued tokens (even
+    though Clerk is registered as a Third-Party Auth provider for the database layer), so
+    each of these functions does its own Clerk token verification inside the handler. If you
+    ever redeploy one of these via the CLI, keep `verify_jwt` off or it'll 401 every request.
+  - `ghl-webhook` / `stripe-webhook` are also `verify_jwt: false` since they're called by
+    external services with no Clerk session at all; they check their own shared secret /
+    Stripe signature instead.
+- Vercel env vars set: `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`,
+  `VITE_CLERK_PUBLISHABLE_KEY`.
 
-## What you need to do
+## What you still need to do
 
-Everything below is a dashboard/account action only you can do. Once you have each value,
-add it where noted (Supabase secrets vs `.env.local`/Vercel env vars).
+Each integration below needs credentials only you can create, set as **Supabase Edge
+Function secrets** (Dashboard -> Edge Functions -> Secrets), not Vercel env vars.
 
-### 1. Clerk (required to sign in at all)
+### Gmail send
 
-1. Create a Clerk application at https://dashboard.clerk.com.
-2. In **Sessions -> Customize session token**, add:
-   ```json
-   { "public_metadata": "{{user.public_metadata}}" }
-   ```
-   This is how the app reads each user's `va` / `leadership` role.
-3. For each teammate, set `publicMetadata.role` to `"va"` or `"leadership"` (User -> Metadata).
-4. Copy the **Publishable key** into `.env.local` as `VITE_CLERK_PUBLISHABLE_KEY`, and also
-   set it in the Vercel project's environment variables once deployed.
-5. Copy the **Secret key** into Supabase Edge Function secrets as `CLERK_SECRET_KEY`
-   (used by every Edge Function to verify who's calling and to look up VA names).
-6. In the Supabase Dashboard, go to **Authentication -> Sign In / Providers -> Third Party
-   Auth**, add Clerk, and paste your Clerk **Frontend API URL** (found in Clerk's API Keys
-   page). This lets Supabase's RLS policies trust Clerk-issued JWTs.
+1. In Google Cloud Console, enable the **Gmail API** and create an OAuth 2.0 Client ID.
+2. Complete the OAuth consent flow once for the company Gmail account to get a refresh token
+   with the `https://www.googleapis.com/auth/gmail.send` scope.
+3. Set: `CLERK_SECRET_KEY` (also needed by every other function below), `GMAIL_CLIENT_ID`,
+   `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_SENDER_ADDRESS`.
 
-### 2. Gmail send
+### GoHighLevel webhook
 
-1. In Google Cloud Console, enable the **Gmail API** and create an OAuth 2.0 Client ID
-   (type: Web application).
-2. Complete the OAuth consent flow once for the company Gmail account to get a refresh
-   token with the `https://www.googleapis.com/auth/gmail.send` scope (the standard way is
-   Google's OAuth Playground, using your own client id/secret).
-3. Set these Supabase secrets: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`,
-   `GMAIL_SENDER_ADDRESS` (the company Gmail address itself).
-
-### 3. GoHighLevel webhook
-
-1. In a GHL Workflow, add a **Webhook** action triggered by whatever tag/pipeline change you
-   want to sync, pointed at:
+1. In a GHL Workflow, add a **Webhook** action pointed at:
    `https://ttfysuuxfxtjwnmxjxtm.supabase.co/functions/v1/ghl-webhook?secret=YOUR_SECRET`
-2. Set the Supabase secret `GHL_WEBHOOK_SECRET` to the same value you put in the URL.
-3. Tag contacts with `track:team`, `track:roa_newbuild`, or `track:mastermind` to set the
-   track (defaults to `team` if missing), and `stage:<Stage Name>` to set the stage (matched
-   case-insensitively against the stages configured in the app; defaults to the first stage).
-4. The raw payload is always logged to that recruit's activity log for debugging.
+2. Set the Supabase secret `GHL_WEBHOOK_SECRET` to that same value.
+3. Tag contacts `program:<Program Name>` (matched case-insensitively; falls back to whichever
+   program has `is_default = true`, currently "Team").
 
-### 4. Stripe webhook
+### Stripe webhook
 
 1. Create a webhook endpoint in the Stripe Dashboard pointed at:
-   `https://ttfysuuxfxtjwnmxjxtm.supabase.co/functions/v1/stripe-webhook`
-   listening for `checkout.session.completed` and `invoice.payment_succeeded`.
-2. Set Supabase secrets: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and
-   `STRIPE_MASTERMIND_PRICE_IDS` (comma-separated Stripe Price IDs for the Mastermind
-   product; leave blank to accept all events, but setting it is strongly recommended if
-   your Stripe account sells anything else).
+   `https://ttfysuuxfxtjwnmxjxtm.supabase.co/functions/v1/stripe-webhook`, listening for
+   `checkout.session.completed` and `invoice.payment_succeeded`.
+2. Set: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_MASTERMIND_PRICE_IDS`
+   (comma-separated Price IDs; leave blank to accept all events, not recommended if you sell
+   anything else). Recruits land in whichever program is named exactly "Mastermind".
 
-### 5. Google Sheets sync
+### Google Sheets sync
 
-1. Create a Google Cloud service account, enable the **Google Sheets API**, and download its
-   JSON key.
-2. Share your destination Google Sheet with the service account's `client_email` (Editor
-   access).
-3. Set the Supabase secret `GOOGLE_SERVICE_ACCOUNT_KEY` to the full JSON key content (as one
-   string).
-4. Edit `supabase/functions/sheets-sync/index.ts`, `SHEET_CONFIG` block: set `SHEET_ID` to
-   your sheet's ID (from its URL) and adjust `SHEET_RANGE` / `COLUMNS` if you want a
-   different layout than the default (Name, Email, Phone, Assigned VA, Onboarded Date).
-   Redeploy the function after editing.
-5. This only fires from the "Mark Onboarded" button on a team-track recruit's detail page
-   (`AUTO_ON_STAGE_CHANGE` is `false`). Flip it to `true` and wire a database trigger if you
-   later want it to fire automatically the moment a recruit reaches the "Onboarded" stage.
+1. Create a Google Cloud service account, enable the **Google Sheets API**, download its JSON
+   key, and share your destination Sheet with the service account's `client_email`.
+2. Set `GOOGLE_SERVICE_ACCOUNT_KEY` to the full JSON key content.
+3. In **Onboarding Programs -> [pick a program] -> Edit**, turn on "Sync onboarded recruits to
+   Google Sheet" for whichever program(s) should push rows.
+4. Edit `supabase/functions/sheets-sync/index.ts`'s `SHEET_CONFIG` block (`SHEET_ID`,
+   `SHEET_RANGE`, `COLUMNS`) and redeploy the function.
+5. This fires from the "Push to Sheet" button on a recruit's detail page, which only appears
+   once every required checklist task is checked off (`onboarded_at` gets set automatically).
 
-### 6. Zoom scheduling
+### Zoom scheduling
 
 1. Create a **Server-to-Server OAuth** app in the Zoom Marketplace under the shared company
-   Zoom account, with the `meeting:write:admin` (or `meeting:write`) scope.
-2. Set Supabase secrets: `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET`.
+   account, with the `meeting:write` scope.
+2. Set: `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET`.
 
-### 7. Vercel
+## How the checklist model works
 
-1. `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_CLERK_PUBLISHABLE_KEY` are
-   the only env vars the frontend needs; set them in the Vercel project settings. Everything
-   else above is a Supabase Edge Function secret, not a Vercel env var.
+- Leadership manages **Programs** (dynamic, not fixed) from Onboarding Programs in the
+  sidebar: create/rename/delete, and per-program toggle for Sheets sync.
+- Each program has an ordered **checklist** of tasks (title, description, required/optional,
+  optional "days to complete" due-date offset from the recruit's `created_at`). Drag to
+  reorder.
+- Each recruit gets that program's checklist; checking off every *required* task sets
+  `onboarded_at` automatically (see the `toggle_checklist_item` Postgres function).
+- Dashboards group recruits by computed status: Not Started / In Progress / Onboarded — this
+  is derived, not stored, so there's nothing to keep in sync.
 
 ## Local development
 
@@ -100,5 +93,5 @@ npm install
 npm run dev
 ```
 
-Requires `.env.local` to have `VITE_CLERK_PUBLISHABLE_KEY` filled in (see step 1 above) -
-the app throws a clear error on boot until that's set.
+Requires `.env.local` with `VITE_CLERK_PUBLISHABLE_KEY`, `VITE_SUPABASE_URL`, and
+`VITE_SUPABASE_PUBLISHABLE_KEY` filled in.
