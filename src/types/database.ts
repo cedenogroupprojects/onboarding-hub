@@ -47,6 +47,75 @@ export type Database = {
           },
         ]
       }
+      programs: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          is_default: boolean
+          name: string
+          sheet_sync_enabled: boolean
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          sheet_sync_enabled?: boolean
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          sheet_sync_enabled?: boolean
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      recruit_checklist_items: {
+        Row: {
+          completed_at: string
+          completed_by: string | null
+          id: string
+          recruit_id: string
+          stage_id: string
+        }
+        Insert: {
+          completed_at?: string
+          completed_by?: string | null
+          id?: string
+          recruit_id: string
+          stage_id: string
+        }
+        Update: {
+          completed_at?: string
+          completed_by?: string | null
+          id?: string
+          recruit_id?: string
+          stage_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recruit_checklist_items_recruit_id_fkey"
+            columns: ["recruit_id"]
+            isOneToOne: false
+            referencedRelation: "recruits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recruit_checklist_items_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recruits: {
         Row: {
           assigned_va_id: string | null
@@ -59,10 +128,9 @@ export type Database = {
           onboarded_at: string | null
           payment_status: string | null
           phone: string | null
+          program_id: string
           source: Database["public"]["Enums"]["recruit_source"]
-          stage_id: string
           stripe_customer_id: string | null
-          track: Database["public"]["Enums"]["track"]
           updated_at: string
           zoom_meeting_link: string | null
         }
@@ -77,10 +145,9 @@ export type Database = {
           onboarded_at?: string | null
           payment_status?: string | null
           phone?: string | null
+          program_id: string
           source?: Database["public"]["Enums"]["recruit_source"]
-          stage_id: string
           stripe_customer_id?: string | null
-          track: Database["public"]["Enums"]["track"]
           updated_at?: string
           zoom_meeting_link?: string | null
         }
@@ -95,19 +162,18 @@ export type Database = {
           onboarded_at?: string | null
           payment_status?: string | null
           phone?: string | null
+          program_id?: string
           source?: Database["public"]["Enums"]["recruit_source"]
-          stage_id?: string
           stripe_customer_id?: string | null
-          track?: Database["public"]["Enums"]["track"]
           updated_at?: string
           zoom_meeting_link?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "recruits_stage_id_fkey"
-            columns: ["stage_id"]
+            foreignKeyName: "recruits_program_id_fkey"
+            columns: ["program_id"]
             isOneToOne: false
-            referencedRelation: "stages"
+            referencedRelation: "programs"
             referencedColumns: ["id"]
           },
         ]
@@ -115,26 +181,43 @@ export type Database = {
       stages: {
         Row: {
           created_at: string
+          days_to_complete: number | null
+          description: string | null
           id: string
           name: string
+          program_id: string
+          required: boolean
           sort_order: number
-          track: Database["public"]["Enums"]["track"]
         }
         Insert: {
           created_at?: string
+          days_to_complete?: number | null
+          description?: string | null
           id?: string
           name: string
+          program_id: string
+          required?: boolean
           sort_order: number
-          track: Database["public"]["Enums"]["track"]
         }
         Update: {
           created_at?: string
+          days_to_complete?: number | null
+          description?: string | null
           id?: string
           name?: string
+          program_id?: string
+          required?: boolean
           sort_order?: number
-          track?: Database["public"]["Enums"]["track"]
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "stages_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       templates: {
         Row: {
@@ -142,9 +225,10 @@ export type Database = {
           created_by: string | null
           id: string
           name: string
+          program_id: string
+          sort_order: number
           stage_id: string | null
           subject: string
-          track: Database["public"]["Enums"]["track"]
           updated_at: string
         }
         Insert: {
@@ -152,9 +236,10 @@ export type Database = {
           created_by?: string | null
           id?: string
           name: string
+          program_id: string
+          sort_order?: number
           stage_id?: string | null
           subject: string
-          track: Database["public"]["Enums"]["track"]
           updated_at?: string
         }
         Update: {
@@ -162,12 +247,20 @@ export type Database = {
           created_by?: string | null
           id?: string
           name?: string
+          program_id?: string
+          sort_order?: number
           stage_id?: string | null
           subject?: string
-          track?: Database["public"]["Enums"]["track"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "templates_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "templates_stage_id_fkey"
             columns: ["stage_id"]
@@ -184,26 +277,38 @@ export type Database = {
     Functions: {
       current_clerk_user_id: { Args: never; Returns: string }
       current_role_name: { Args: never; Returns: string }
-      move_recruit_stage: {
-        Args: { p_actor_id: string; p_new_stage_id: string; p_recruit_id: string }
-        Returns: undefined
-      }
       reassign_recruit: {
         Args: { p_actor_id: string; p_new_va_id: string; p_recruit_id: string }
         Returns: undefined
       }
-      update_recruit_notes: {
-        Args: { p_actor_id: string; p_notes: string; p_recruit_id: string }
+      reorder_stages: {
+        Args: { p_ordered_ids: string[]; p_program_id: string }
         Returns: undefined
       }
       swap_stage_order: {
         Args: { p_stage_a: string; p_stage_b: string }
         Returns: undefined
       }
+      swap_template_order: {
+        Args: { p_template_a: string; p_template_b: string }
+        Returns: undefined
+      }
+      toggle_checklist_item: {
+        Args: {
+          p_actor_id: string
+          p_completed: boolean
+          p_recruit_id: string
+          p_stage_id: string
+        }
+        Returns: undefined
+      }
+      update_recruit_notes: {
+        Args: { p_actor_id: string; p_notes: string; p_recruit_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       recruit_source: "manual" | "ghl" | "stripe"
-      track: "team" | "roa_newbuild" | "mastermind"
     }
     CompositeTypes: {
       [_ in never]: never

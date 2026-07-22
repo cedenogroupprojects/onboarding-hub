@@ -1,18 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useSupabase } from "@/lib/supabase/useSupabase"
-import type { Stage, Track } from "@/types/domain"
+import type { Stage } from "@/types/domain"
 
-export function useStages(track?: Track) {
+export function useStages(programId?: string) {
   const supabase = useSupabase()
 
   return useQuery({
-    queryKey: ["stages", track ?? "all"],
+    queryKey: ["stages", programId ?? "all"],
     queryFn: async () => {
       let query = supabase.from("stages").select("*").order("sort_order", { ascending: true })
-      if (track) query = query.eq("track", track)
+      if (programId) query = query.eq("program_id", programId)
       const { data, error } = await query
       if (error) throw error
-      return data
+      return data as Stage[]
     },
   })
 }
@@ -22,26 +22,52 @@ function useInvalidateStages() {
   return () => queryClient.invalidateQueries({ queryKey: ["stages"] })
 }
 
+export interface StageInput {
+  name: string
+  description: string
+  required: boolean
+  daysToComplete: number | null
+}
+
 export function useCreateStage() {
   const supabase = useSupabase()
   const invalidate = useInvalidateStages()
 
   return useMutation({
-    mutationFn: async ({ track, name, sortOrder }: { track: Track; name: string; sortOrder: number }) => {
-      const { error } = await supabase.from("stages").insert({ track, name, sort_order: sortOrder })
+    mutationFn: async ({
+      programId,
+      sortOrder,
+      ...input
+    }: StageInput & { programId: string; sortOrder: number }) => {
+      const { error } = await supabase.from("stages").insert({
+        program_id: programId,
+        name: input.name,
+        description: input.description || null,
+        required: input.required,
+        days_to_complete: input.daysToComplete,
+        sort_order: sortOrder,
+      })
       if (error) throw error
     },
     onSuccess: invalidate,
   })
 }
 
-export function useRenameStage() {
+export function useUpdateStage() {
   const supabase = useSupabase()
   const invalidate = useInvalidateStages()
 
   return useMutation({
-    mutationFn: async ({ id, name }: { id: string; name: string }) => {
-      const { error } = await supabase.from("stages").update({ name }).eq("id", id)
+    mutationFn: async ({ id, ...input }: StageInput & { id: string }) => {
+      const { error } = await supabase
+        .from("stages")
+        .update({
+          name: input.name,
+          description: input.description || null,
+          required: input.required,
+          days_to_complete: input.daysToComplete,
+        })
+        .eq("id", id)
       if (error) throw error
     },
     onSuccess: invalidate,
@@ -61,15 +87,15 @@ export function useDeleteStage() {
   })
 }
 
-export function useSwapStageOrder() {
+export function useReorderStages() {
   const supabase = useSupabase()
   const invalidate = useInvalidateStages()
 
   return useMutation({
-    mutationFn: async ({ a, b }: { a: Stage; b: Stage }) => {
-      const { error } = await supabase.rpc("swap_stage_order", {
-        p_stage_a: a.id,
-        p_stage_b: b.id,
+    mutationFn: async ({ programId, orderedIds }: { programId: string; orderedIds: string[] }) => {
+      const { error } = await supabase.rpc("reorder_stages", {
+        p_program_id: programId,
+        p_ordered_ids: orderedIds,
       })
       if (error) throw error
     },

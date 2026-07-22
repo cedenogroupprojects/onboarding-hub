@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/Button"
-import { useRecruits, useMoveRecruitStage, type RecruitFilters } from "@/features/recruits/api"
-import { useStages } from "@/features/stages/api"
+import { useRecruits, type RecruitFilters } from "@/features/recruits/api"
 import { KanbanBoard } from "./components/KanbanBoard"
 import { RecruitTable } from "./components/RecruitTable"
 import { FiltersBar } from "./components/FiltersBar"
@@ -12,21 +11,7 @@ export function LeadershipDashboardPage() {
   const [filters, setFilters] = useState<RecruitFilters>({})
   const [newRecruitOpen, setNewRecruitOpen] = useState(false)
 
-  const kanbanTrack = filters.track ?? "team"
-  const { data: kanbanStages } = useStages(view === "kanban" ? kanbanTrack : undefined)
-  const { data: allStages } = useStages()
-  const { data: recruits, isLoading } = useRecruits(
-    view === "kanban" ? { ...filters, track: kanbanTrack, stageId: undefined } : filters,
-  )
-  const moveStage = useMoveRecruitStage()
-
-  const stagesByTrack = useMemo(() => {
-    const map: Record<string, typeof allStages> = {}
-    for (const stage of allStages ?? []) {
-      map[stage.track] = [...(map[stage.track] ?? []), stage]
-    }
-    return map as Record<string, NonNullable<typeof allStages>>
-  }, [allStages])
+  const { data: recruits, isLoading } = useRecruits(filters)
 
   return (
     <div className="flex h-full flex-col">
@@ -37,30 +22,15 @@ export function LeadershipDashboardPage() {
         </Button>
       </div>
 
-      <FiltersBar
-        filters={filters}
-        onChange={setFilters}
-        stages={stagesByTrack[filters.track ?? ""] ?? []}
-        view={view}
-        onViewChange={setView}
-      />
+      <FiltersBar filters={filters} onChange={setFilters} view={view} onViewChange={setView} />
 
       <div className="flex-1 overflow-auto p-4">
         {isLoading ? (
           <div className="py-10 text-center text-sm text-zinc-400">Loading recruits...</div>
         ) : view === "kanban" ? (
-          <KanbanBoard
-            stages={kanbanStages ?? []}
-            recruits={recruits ?? []}
-            detailBasePath="/recruits"
-            onMoveStage={(recruitId, stageId) => moveStage.mutate({ recruitId, stageId })}
-          />
+          <KanbanBoard recruits={recruits ?? []} detailBasePath="/recruits" />
         ) : (
-          <RecruitTable
-            recruits={recruits ?? []}
-            stagesByTrack={stagesByTrack}
-            onMoveStage={(recruitId, stageId) => moveStage.mutate({ recruitId, stageId })}
-          />
+          <RecruitTable recruits={recruits ?? []} />
         )}
       </div>
 

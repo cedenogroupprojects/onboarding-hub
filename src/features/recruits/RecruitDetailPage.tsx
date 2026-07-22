@@ -3,19 +3,19 @@ import { Link, useParams } from "react-router-dom"
 import { Textarea } from "@/components/ui/Input"
 import { Button } from "@/components/ui/Button"
 import { Badge } from "@/components/ui/Badge"
-import { Select } from "@/components/ui/Select"
-import { useActivityLog, useRecruit, useMoveRecruitStage, useUpdateRecruitNotes } from "./api"
-import { useStages } from "@/features/stages/api"
+import { useActivityLog, useRecruit, useUpdateRecruitNotes } from "./api"
 import { ReassignSelect } from "./components/ReassignSelect"
 import { MarkOnboardedButton } from "./components/MarkOnboardedButton"
 import { ScheduleCallButton } from "./components/ScheduleCallButton"
+import { ChecklistPanel } from "@/features/checklist/ChecklistPanel"
 import { TemplateSendPanel } from "@/features/templates/TemplateSendPanel"
 import { useRole } from "@/lib/auth/useRole"
-import { TRACK_LABELS, SOURCE_LABELS } from "@/types/domain"
+import { SOURCE_LABELS } from "@/types/domain"
 
 const ACTION_LABELS: Record<string, string> = {
   created: "Recruit created",
-  stage_change: "Stage changed",
+  checklist_item_completed: "Checklist task completed",
+  checklist_item_unchecked: "Checklist task unchecked",
   reassigned: "Reassigned",
   note_updated: "Note added",
   template_sent: "Email sent",
@@ -30,8 +30,6 @@ export function RecruitDetailPage() {
   const role = useRole()
   const { data: recruit, isLoading } = useRecruit(recruitId)
   const { data: activity } = useActivityLog(recruitId)
-  const { data: stages } = useStages(recruit?.track)
-  const moveStage = useMoveRecruitStage()
   const updateNotes = useUpdateRecruitNotes()
   const [notesDraft, setNotesDraft] = useState("")
 
@@ -58,25 +56,13 @@ export function RecruitDetailPage() {
           {recruit.phone && <div className="text-sm text-zinc-500">{recruit.phone}</div>}
         </div>
         <div className="flex items-center gap-1.5">
-          <Badge color="blue">{TRACK_LABELS[recruit.track]}</Badge>
+          <Badge color="blue">{recruit.program?.name}</Badge>
           <Badge color="zinc">{SOURCE_LABELS[recruit.source]}</Badge>
+          {recruit.onboarded_at && <Badge color="green">Onboarded</Badge>}
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-4">
-        <div className="rounded-lg border border-zinc-200 bg-white p-3">
-          <div className="mb-1 text-xs font-medium text-zinc-500">Stage</div>
-          <Select
-            value={recruit.stage_id}
-            onChange={(e) => moveStage.mutate({ recruitId: recruit.id, stageId: e.target.value })}
-            className="w-full"
-          >
-            {stages?.map((stage) => (
-              <option key={stage.id} value={stage.id}>{stage.name}</option>
-            ))}
-          </Select>
-        </div>
-
+      <div className="mt-5">
         <div className="rounded-lg border border-zinc-200 bg-white p-3">
           <div className="mb-1 text-xs font-medium text-zinc-500">Assigned VA</div>
           {role === "leadership" ? (
@@ -87,7 +73,11 @@ export function RecruitDetailPage() {
         </div>
       </div>
 
-      {recruit.track === "team" && (
+      <div className="mt-4">
+        <ChecklistPanel recruit={recruit} />
+      </div>
+
+      {recruit.program?.sheet_sync_enabled && (
         <div className="mt-4">
           <MarkOnboardedButton recruit={recruit} />
         </div>

@@ -4,13 +4,13 @@ import { Modal } from "@/components/ui/Modal"
 import { Input } from "@/components/ui/Input"
 import { Button } from "@/components/ui/Button"
 import { useEdgeFunction } from "@/lib/supabase/useEdgeFunction"
-import type { RecruitWithStage } from "@/features/recruits/api"
+import type { RecruitWithProgram } from "@/features/recruits/api"
 
 export function ScheduleCallButton({
   recruit,
   compact = false,
 }: {
-  recruit: RecruitWithStage
+  recruit: RecruitWithProgram
   compact?: boolean
 }) {
   const [open, setOpen] = useState(false)

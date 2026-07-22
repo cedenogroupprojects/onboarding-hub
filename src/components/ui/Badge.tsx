@@ -6,6 +6,7 @@ const COLORS: Record<string, string> = {
   green: "bg-green-100 text-green-700",
   amber: "bg-amber-100 text-amber-700",
   purple: "bg-purple-100 text-purple-700",
+  red: "bg-red-100 text-red-700",
 }
 
 export function Badge({ children, color = "zinc" }: { children: ReactNode; color?: string }) {

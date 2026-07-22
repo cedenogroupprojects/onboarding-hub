@@ -6,10 +6,10 @@ import { Input, Textarea } from "@/components/ui/Input"
 import { useTemplates } from "./api"
 import { renderMergeFields } from "./mergeFields"
 import { useEdgeFunction } from "@/lib/supabase/useEdgeFunction"
-import type { RecruitWithStage } from "@/features/recruits/api"
+import type { RecruitWithProgram } from "@/features/recruits/api"
 
-export function TemplateSendPanel({ recruit }: { recruit: RecruitWithStage }) {
-  const { data: templates } = useTemplates(recruit.track)
+export function TemplateSendPanel({ recruit }: { recruit: RecruitWithProgram }) {
+  const { data: templates } = useTemplates(recruit.program_id)
   const callEdgeFunction = useEdgeFunction()
   const queryClient = useQueryClient()
 

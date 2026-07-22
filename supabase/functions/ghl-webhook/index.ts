@@ -10,8 +10,6 @@ function verifySecret(req: Request, url: URL) {
   if (provided !== expected) throw new Error("Invalid webhook secret")
 }
 
-const TRACK_VALUES = new Set(["team", "roa_newbuild", "mastermind"])
-
 interface GhlPayload {
   contact_id?: string
   contactId?: string
@@ -55,22 +53,19 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     )
 
-    const trackTag = extractTagValue(payload.tags, "track")
-    const track = trackTag && TRACK_VALUES.has(trackTag) ? trackTag : "team"
+    const { data: programs, error: programsError } = await supabase
+      .from("programs")
+      .select("id, name, is_default")
+    if (programsError) throw programsError
+    if (!programs || programs.length === 0) throw new Error("No programs configured")
 
-    const { data: trackStages, error: stagesError } = await supabase
-      .from("stages")
-      .select("id, name, sort_order")
-      .eq("track", track)
-      .order("sort_order", { ascending: true })
-    if (stagesError) throw stagesError
-    if (!trackStages || trackStages.length === 0) throw new Error(`No stages configured for track "${track}"`)
-
-    const stageTag = extractTagValue(payload.tags, "stage")
-    const matchedStage = stageTag
-      ? trackStages.find((s) => normalize(s.name) === normalize(stageTag))
+    // Tag a contact `program:<name>` (or the legacy `track:<name>`) to route it to a
+    // specific program; unmatched or missing tags fall back to the default program.
+    const programTag = extractTagValue(payload.tags, "program") ?? extractTagValue(payload.tags, "track")
+    const matchedProgram = programTag
+      ? programs.find((p) => normalize(p.name) === normalize(programTag))
       : undefined
-    const stage = matchedStage ?? trackStages[0]
+    const program = matchedProgram ?? programs.find((p) => p.is_default) ?? programs[0]
 
     const { data: existing, error: findError } = await supabase
       .from("recruits")
@@ -84,13 +79,7 @@ Deno.serve(async (req) => {
     if (existing) {
       const { error: updateError } = await supabase
         .from("recruits")
-        .update({
-          name,
-          email,
-          phone: payload.phone ?? null,
-          track,
-          stage_id: stage.id,
-        })
+        .update({ name, email, phone: payload.phone ?? null, program_id: program.id })
         .eq("id", existing.id)
       if (updateError) throw updateError
       recruitId = existing.id
@@ -101,8 +90,7 @@ Deno.serve(async (req) => {
           name,
           email,
           phone: payload.phone ?? null,
-          track,
-          stage_id: stage.id,
+          program_id: program.id,
           source: "ghl",
           ghl_contact_id: contactId,
         })
@@ -116,7 +104,7 @@ Deno.serve(async (req) => {
       recruit_id: recruitId,
       actor_id: null,
       action: "ghl_sync",
-      detail: { payload, resolved_track: track, resolved_stage: stage.name },
+      detail: { payload, resolved_program: program.name },
     })
 
     return new Response(JSON.stringify({ ok: true, recruit_id: recruitId }), {

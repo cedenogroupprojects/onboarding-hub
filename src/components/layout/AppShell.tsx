@@ -28,11 +28,8 @@ export function AppShell() {
               <NavLink to="/leadership" end className={navLinkClass}>
                 Dashboard
               </NavLink>
-              <NavLink to="/leadership/templates" className={navLinkClass}>
-                Templates
-              </NavLink>
-              <NavLink to="/leadership/stages" className={navLinkClass}>
-                Stages
+              <NavLink to="/leadership/programs" className={navLinkClass}>
+                Onboarding Programs
               </NavLink>
             </>
           ) : (

@@ -2,28 +2,24 @@ import { useState } from "react"
 import { useAuth } from "@clerk/clerk-react"
 import { Button } from "@/components/ui/Button"
 import { Input } from "@/components/ui/Input"
-import { useRecruits, useMoveRecruitStage } from "@/features/recruits/api"
-import { useStages } from "@/features/stages/api"
+import { Select } from "@/components/ui/Select"
+import { useRecruits } from "@/features/recruits/api"
+import { usePrograms } from "@/features/programs/api"
 import { KanbanBoard } from "./components/KanbanBoard"
 import { NewRecruitDialog } from "./components/NewRecruitDialog"
-import { TRACK_LABELS } from "@/types/domain"
-import type { Track } from "@/types/domain"
-
-const TRACKS = Object.keys(TRACK_LABELS) as Track[]
 
 export function VaDashboardPage() {
   const { userId } = useAuth()
-  const [track, setTrack] = useState<Track>("team")
+  const [programId, setProgramId] = useState<string | undefined>(undefined)
   const [search, setSearch] = useState("")
   const [newRecruitOpen, setNewRecruitOpen] = useState(false)
 
-  const { data: stages } = useStages(track)
+  const { data: programs } = usePrograms()
   const { data: recruits, isLoading } = useRecruits({
-    track,
+    programId,
     assignedVaId: userId ?? undefined,
     search: search || undefined,
   })
-  const moveStage = useMoveRecruitStage()
 
   return (
     <div className="flex h-full flex-col">
@@ -35,18 +31,12 @@ export function VaDashboardPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-4 py-2.5">
-        <div className="flex overflow-hidden rounded-md border border-zinc-300">
-          {TRACKS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTrack(t)}
-              className={`px-3 py-1.5 text-sm font-medium ${track === t ? "bg-zinc-900 text-white" : "bg-white text-zinc-600 hover:bg-zinc-50"}`}
-            >
-              {TRACK_LABELS[t]}
-            </button>
+        <Select value={programId ?? ""} onChange={(e) => setProgramId(e.target.value || undefined)}>
+          <option value="">All programs</option>
+          {programs?.map((program) => (
+            <option key={program.id} value={program.id}>{program.name}</option>
           ))}
-        </div>
+        </Select>
         <Input
           placeholder="Search name or email..."
           value={search}
@@ -59,19 +49,14 @@ export function VaDashboardPage() {
         {isLoading ? (
           <div className="py-10 text-center text-sm text-zinc-400">Loading recruits...</div>
         ) : (
-          <KanbanBoard
-            stages={stages ?? []}
-            recruits={recruits ?? []}
-            detailBasePath="/va/recruits"
-            onMoveStage={(recruitId, stageId) => moveStage.mutate({ recruitId, stageId })}
-          />
+          <KanbanBoard recruits={recruits ?? []} detailBasePath="/va/recruits" />
         )}
       </div>
 
       <NewRecruitDialog
         open={newRecruitOpen}
         onClose={() => setNewRecruitOpen(false)}
-        defaultTrack={track}
+        defaultProgramId={programId}
       />
     </div>
   )

@@ -8,8 +8,7 @@ import { NoRoleAssignedPage } from "@/pages/NoRoleAssignedPage"
 import { LeadershipDashboardPage } from "@/features/recruits/LeadershipDashboardPage"
 import { VaDashboardPage } from "@/features/recruits/VaDashboardPage"
 import { RecruitDetailPage } from "@/features/recruits/RecruitDetailPage"
-import { TemplateManagerPage } from "@/features/templates/TemplateManagerPage"
-import { StagesPage } from "@/features/stages/StagesPage"
+import { OnboardingProgramsPage } from "@/features/programs/OnboardingProgramsPage"
 
 function App() {
   return (
@@ -31,18 +30,10 @@ function App() {
             }
           />
           <Route
-            path="/leadership/templates"
+            path="/leadership/programs"
             element={
               <RequireRole role="leadership">
-                <TemplateManagerPage />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/leadership/stages"
-            element={
-              <RequireRole role="leadership">
-                <StagesPage />
+                <OnboardingProgramsPage />
               </RequireRole>
             }
           />

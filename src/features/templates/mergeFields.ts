@@ -1,4 +1,4 @@
-import type { RecruitWithStage } from "@/features/recruits/api"
+import type { RecruitWithProgram } from "@/features/recruits/api"
 
 export const MERGE_FIELD_HINTS = [
   "{{first_name}}",
@@ -6,12 +6,12 @@ export const MERGE_FIELD_HINTS = [
   "{{full_name}}",
   "{{email}}",
   "{{phone}}",
-  "{{stage}}",
+  "{{program}}",
   "{{zoom_link}}",
 ]
 
 /** Replaces {{merge_fields}} with recruit data. Unknown fields are left untouched. */
-export function renderMergeFields(text: string, recruit: RecruitWithStage): string {
+export function renderMergeFields(text: string, recruit: RecruitWithProgram): string {
   const [firstName, ...rest] = recruit.name.trim().split(/\s+/)
 
   const fields: Record<string, string> = {
@@ -20,7 +20,7 @@ export function renderMergeFields(text: string, recruit: RecruitWithStage): stri
     full_name: recruit.name,
     email: recruit.email,
     phone: recruit.phone ?? "",
-    stage: recruit.stage?.name ?? "",
+    program: recruit.program?.name ?? "",
     zoom_link: recruit.zoom_meeting_link ?? "",
   }
 

@@ -1,25 +1,24 @@
 import { Select } from "@/components/ui/Select"
 import { Input } from "@/components/ui/Input"
 import { Button } from "@/components/ui/Button"
-import { TRACK_LABELS, SOURCE_LABELS } from "@/types/domain"
+import { SOURCE_LABELS } from "@/types/domain"
 import { useVaUsers } from "@/features/team/api"
+import { usePrograms } from "@/features/programs/api"
 import type { RecruitFilters } from "@/features/recruits/api"
-import type { Stage, Track } from "@/types/domain"
 
 export function FiltersBar({
   filters,
   onChange,
-  stages,
   view,
   onViewChange,
 }: {
   filters: RecruitFilters
   onChange: (filters: RecruitFilters) => void
-  stages: Stage[]
   view: "table" | "kanban"
   onViewChange: (view: "table" | "kanban") => void
 }) {
   const { data: vas } = useVaUsers()
+  const { data: programs } = usePrograms()
 
   return (
     <div className="flex flex-wrap items-center gap-2 border-b border-zinc-200 bg-white px-4 py-2.5">
@@ -41,26 +40,14 @@ export function FiltersBar({
       </div>
 
       <Select
-        value={filters.track ?? ""}
-        onChange={(e) => onChange({ ...filters, track: (e.target.value || undefined) as Track | undefined, stageId: undefined })}
+        value={filters.programId ?? ""}
+        onChange={(e) => onChange({ ...filters, programId: e.target.value || undefined })}
       >
-        <option value="">All tracks</option>
-        {Object.entries(TRACK_LABELS).map(([value, label]) => (
-          <option key={value} value={value}>{label}</option>
+        <option value="">All programs</option>
+        {programs?.map((program) => (
+          <option key={program.id} value={program.id}>{program.name}</option>
         ))}
       </Select>
-
-      {view === "table" && (
-        <Select
-          value={filters.stageId ?? ""}
-          onChange={(e) => onChange({ ...filters, stageId: e.target.value || undefined })}
-        >
-          <option value="">All stages</option>
-          {stages.map((stage) => (
-            <option key={stage.id} value={stage.id}>{stage.name}</option>
-          ))}
-        </Select>
-      )}
 
       <Select
         value={filters.assignedVaId ?? ""}
@@ -89,7 +76,7 @@ export function FiltersBar({
         className="w-56"
       />
 
-      {(filters.track || filters.stageId || filters.assignedVaId || filters.source || filters.search) && (
+      {(filters.programId || filters.assignedVaId || filters.source || filters.search) && (
         <Button variant="ghost" onClick={() => onChange({})}>Clear</Button>
       )}
     </div>

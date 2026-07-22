@@ -13,23 +13,17 @@ function mastermindPriceIds(): Set<string> {
   )
 }
 
-function normalize(value: string) {
-  return value.toLowerCase().replace(/[_-]+/g, " ").trim()
-}
-
 async function upsertMastermindRecruit(
   supabase: ReturnType<typeof createClient>,
   input: { customerId: string; email: string; name: string },
 ) {
-  const { data: stages, error: stagesError } = await supabase
-    .from("stages")
-    .select("id, name, sort_order")
-    .eq("track", "mastermind")
-    .order("sort_order", { ascending: true })
-  if (stagesError) throw stagesError
-  if (!stages || stages.length === 0) throw new Error("No stages configured for track \"mastermind\"")
-
-  const paidStage = stages.find((s) => normalize(s.name) === "paid") ?? stages[0]
+  const { data: program, error: programError } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("name", "Mastermind")
+    .maybeSingle()
+  if (programError) throw programError
+  if (!program) throw new Error('No "Mastermind" program configured')
 
   const { data: existing, error: findError } = await supabase
     .from("recruits")
@@ -43,7 +37,7 @@ async function upsertMastermindRecruit(
   if (existing) {
     const { error: updateError } = await supabase
       .from("recruits")
-      .update({ payment_status: "paid", stage_id: paidStage.id })
+      .update({ payment_status: "paid" })
       .eq("id", existing.id)
     if (updateError) throw updateError
     recruitId = existing.id
@@ -53,8 +47,7 @@ async function upsertMastermindRecruit(
       .insert({
         name: input.name,
         email: input.email,
-        track: "mastermind",
-        stage_id: paidStage.id,
+        program_id: program.id,
         source: "stripe",
         stripe_customer_id: input.customerId,
         payment_status: "paid",

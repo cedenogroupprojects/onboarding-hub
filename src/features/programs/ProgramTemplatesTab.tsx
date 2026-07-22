@@ -1,23 +1,28 @@
 import { useState } from "react"
 import { Button } from "@/components/ui/Button"
 import { Input, Textarea } from "@/components/ui/Input"
-import { useTemplates, useCreateTemplate, useUpdateTemplate, useDeleteTemplate } from "./api"
-import { MERGE_FIELD_HINTS } from "./mergeFields"
-import { TRACK_LABELS } from "@/types/domain"
-import type { Template, Track } from "@/types/domain"
+import { SortableList } from "@/components/dnd/SortableList"
+import {
+  useTemplates,
+  useCreateTemplate,
+  useUpdateTemplate,
+  useDeleteTemplate,
+  useReorderTemplates,
+} from "@/features/templates/api"
+import { MERGE_FIELD_HINTS } from "@/features/templates/mergeFields"
+import type { Template } from "@/types/domain"
 
-const TRACKS = Object.keys(TRACK_LABELS) as Track[]
 const EMPTY_DRAFT = { name: "", subject: "", body: "" }
 
-export function TemplateManagerPage() {
-  const [track, setTrack] = useState<Track>("team")
+export function ProgramTemplatesTab({ programId }: { programId: string }) {
   const [selected, setSelected] = useState<Template | null>(null)
   const [draft, setDraft] = useState(EMPTY_DRAFT)
 
-  const { data: templates } = useTemplates(track)
+  const { data: templates } = useTemplates(programId)
   const createTemplate = useCreateTemplate()
   const updateTemplate = useUpdateTemplate()
   const deleteTemplate = useDeleteTemplate()
+  const reorderTemplates = useReorderTemplates()
 
   function selectTemplate(template: Template | null) {
     setSelected(template)
@@ -34,7 +39,7 @@ export function TemplateManagerPage() {
       )
     } else {
       createTemplate.mutate(
-        { track, stage_id: null, name: draft.name, subject: draft.subject, body: draft.body },
+        { program_id: programId, stage_id: null, name: draft.name, subject: draft.subject, body: draft.body },
         { onSuccess: () => selectTemplate(null) },
       )
     }
@@ -48,33 +53,37 @@ export function TemplateManagerPage() {
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl gap-6 p-6">
+    <div className="flex gap-6">
       <div className="w-56 shrink-0">
-        <div className="mb-3 flex overflow-hidden rounded-md border border-zinc-300 w-fit">
-          {TRACKS.map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => { setTrack(t); selectTemplate(null) }}
-              className={`px-2.5 py-1.5 text-xs font-medium ${track === t ? "bg-zinc-900 text-white" : "bg-white text-zinc-600 hover:bg-zinc-50"}`}
-            >
-              {TRACK_LABELS[t]}
-            </button>
-          ))}
-        </div>
-
         <div className="flex flex-col gap-1">
-          {templates?.map((template) => (
-            <button
-              key={template.id}
-              type="button"
-              onClick={() => selectTemplate(template)}
-              className={`rounded-md px-2.5 py-1.5 text-left text-sm ${selected?.id === template.id ? "bg-blue-50 text-blue-700" : "text-zinc-600 hover:bg-zinc-100"}`}
-            >
-              {template.name}
-            </button>
-          ))}
-          {templates?.length === 0 && (
+          {templates && templates.length > 0 ? (
+            <SortableList
+              items={templates}
+              onReorder={(orderedIds) => reorderTemplates.mutate(orderedIds)}
+              renderItem={(template, handle) => (
+                <div
+                  className={`flex items-center gap-1 rounded-md px-1 ${selected?.id === template.id ? "bg-blue-50" : "hover:bg-zinc-100"}`}
+                >
+                  <button
+                    type="button"
+                    {...handle.attributes}
+                    {...handle.listeners}
+                    className="cursor-grab touch-none px-1 text-zinc-300 hover:text-zinc-500 active:cursor-grabbing"
+                    aria-label="Drag to reorder"
+                  >
+                    ⠿
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectTemplate(template)}
+                    className={`flex-1 truncate py-1.5 text-left text-sm ${selected?.id === template.id ? "text-blue-700" : "text-zinc-600"}`}
+                  >
+                    {template.name}
+                  </button>
+                </div>
+              )}
+            />
+          ) : (
             <div className="px-2.5 py-1.5 text-sm text-zinc-400">No templates yet.</div>
           )}
         </div>
@@ -86,9 +95,9 @@ export function TemplateManagerPage() {
 
       <div className="flex-1 rounded-lg border border-zinc-200 bg-white p-4">
         <div className="mb-3 flex items-center justify-between">
-          <h1 className="text-sm font-semibold text-zinc-900">
+          <h2 className="text-sm font-semibold text-zinc-900">
             {selected ? "Edit template" : "New template"}
-          </h1>
+          </h2>
           {selected && (
             <Button variant="danger" onClick={() => handleDelete(selected)}>
               Delete

@@ -107,12 +107,14 @@ Deno.serve(async (req) => {
 
     const { data: recruit, error } = await supabase
       .from("recruits")
-      .select("*, stage:stages(name)")
+      .select("*, program:programs(name, sheet_sync_enabled)")
       .eq("id", recruitId)
       .single()
     if (error || !recruit) throw new Error("Recruit not found")
 
-    if (recruit.track !== "team") throw new Error("Only team-track recruits sync to the sheet")
+    if (!recruit.program?.sheet_sync_enabled) {
+      throw new Error(`Program "${recruit.program?.name}" is not configured to sync to the sheet`)
+    }
     if (role === "va" && recruit.assigned_va_id !== userId) {
       throw new Error("Not authorized for this recruit")
     }

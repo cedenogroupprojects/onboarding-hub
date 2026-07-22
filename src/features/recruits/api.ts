@@ -1,20 +1,29 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { useAuth } from "@clerk/clerk-react"
 import { useSupabase } from "@/lib/supabase/useSupabase"
-import type { Recruit, RecruitSource, Stage, Track } from "@/types/domain"
+import type { Program, Recruit, RecruitSource, RecruitStatus } from "@/types/domain"
 import type { TablesInsert } from "@/types/database"
 
-export type RecruitWithStage = Recruit & { stage: Pick<Stage, "id" | "name" | "sort_order"> }
+export type RecruitWithProgram = Recruit & {
+  program: Pick<Program, "id" | "name" | "sheet_sync_enabled">
+  checklist_items: { count: number }[]
+}
+
+export function getRecruitStatus(recruit: RecruitWithProgram): RecruitStatus {
+  if (recruit.onboarded_at) return "onboarded"
+  const completedCount = recruit.checklist_items?.[0]?.count ?? 0
+  return completedCount > 0 ? "in_progress" : "not_started"
+}
 
 export interface RecruitFilters {
-  track?: Track
-  stageId?: string
+  programId?: string
   assignedVaId?: string
   source?: RecruitSource
   search?: string
 }
 
-const RECRUIT_SELECT = "*, stage:stages(id,name,sort_order)"
+const RECRUIT_SELECT =
+  "*, program:programs(id,name,sheet_sync_enabled), checklist_items:recruit_checklist_items(count)"
 
 export function useRecruits(filters: RecruitFilters = {}) {
   const supabase = useSupabase()
@@ -24,8 +33,7 @@ export function useRecruits(filters: RecruitFilters = {}) {
     queryFn: async () => {
       let query = supabase.from("recruits").select(RECRUIT_SELECT)
 
-      if (filters.track) query = query.eq("track", filters.track)
-      if (filters.stageId) query = query.eq("stage_id", filters.stageId)
+      if (filters.programId) query = query.eq("program_id", filters.programId)
       if (filters.assignedVaId) query = query.eq("assigned_va_id", filters.assignedVaId)
       if (filters.source) query = query.eq("source", filters.source)
       if (filters.search) {
@@ -34,7 +42,7 @@ export function useRecruits(filters: RecruitFilters = {}) {
 
       const { data, error } = await query.order("created_at", { ascending: false })
       if (error) throw error
-      return data as RecruitWithStage[]
+      return data as unknown as RecruitWithProgram[]
     },
   })
 }
@@ -52,7 +60,7 @@ export function useRecruit(recruitId: string | undefined) {
         .eq("id", recruitId!)
         .single()
       if (error) throw error
-      return data as RecruitWithStage
+      return data as unknown as RecruitWithProgram
     },
   })
 }
@@ -107,27 +115,9 @@ export function useCreateRecruit() {
         detail: { source: input.source ?? "manual" },
       })
 
-      return data as RecruitWithStage
+      return data as unknown as RecruitWithProgram
     },
     onSuccess: () => invalidate(),
-  })
-}
-
-export function useMoveRecruitStage() {
-  const supabase = useSupabase()
-  const { userId } = useAuth()
-  const invalidate = useInvalidateRecruits()
-
-  return useMutation({
-    mutationFn: async ({ recruitId, stageId }: { recruitId: string; stageId: string }) => {
-      const { error } = await supabase.rpc("move_recruit_stage", {
-        p_recruit_id: recruitId,
-        p_new_stage_id: stageId,
-        p_actor_id: userId ?? "",
-      })
-      if (error) throw error
-    },
-    onSuccess: (_data, variables) => invalidate(variables.recruitId),
   })
 }
 
